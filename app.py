@@ -2,9 +2,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import joblib
 import pandas as pd
+import json
 
 # Load the trained model
 model = joblib.load("fishing_zone_model.pkl")
+
+# Store detected fishing locations
+fishing_zones = []
 
 # Define input schema
 class ShipData(BaseModel):
@@ -23,18 +27,18 @@ def home():
 
 @app.post("/predict")
 def predict(data: ShipData):
-    """
-    Input: JSON object with ship's details (distance_from_shore, distance_from_port, speed, course, lat, lon)
-    Output: Fishing prediction (1: Fishing, 0: Not Fishing)
-    """
     try:
-        # Convert input to DataFrame
-        df = pd.DataFrame([data.dict()])  # Convert Pydantic model to dictionary
-        
-        # Predict
+        df = pd.DataFrame([data.dict()])
         prediction = model.predict(df)[0]
+
+        if prediction == 1:
+            fishing_zones.append({"lat": data.lat, "lon": data.lon})
 
         return {"is_fishing": int(prediction)}
 
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/fishing_zones")
+def get_fishing_zones():
+    return {"fishing_zones": fishing_zones}
